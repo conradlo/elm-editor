@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Main exposing (Hover(..), InputModifier, KeyboardEventType(..), Model, ModifierKeyType(..), Msg(..), Position, Selection(..), clampColumn, comparePositions, endOfDocument, fontSize, hoversToPositions, init, initModel, insertChar, isEndOfDocument, isFirstColumn, isFirstLine, isLastColumn, isLastLine, isSelected, isStartOfDocument, keyDecoder, keyDownToMsg, keyUpToMsg, lastColumn, lastLine, lineContent, lineHeight, lineLength, main, maxLine, moveDown, moveLeft, moveRight, moveUp, nbsp, newLine, nextLine, onHover, previousLine, removeCharAfter, removeCharBefore, sanitizeHover, selectedText, startOfDocument, subscriptions, update, view, viewChar, viewChars, viewContent, viewCursor, viewDebug, viewEditor, viewLine, viewLineNumber, viewLineNumbers, viewLines, viewSelectedChar)
 
 import Array exposing (Array)
 import Browser as Browser
@@ -25,6 +25,27 @@ type alias Model =
     , cursor : Position
     , hover : Hover
     , selection : Selection
+    , modifier : InputModifier
+    }
+
+
+type KeyboardEventType
+    = KeyUp
+    | KeyDown
+
+
+type ModifierKeyType
+    = Alt
+    | Control
+    | Meta
+    | Shift
+
+
+type alias InputModifier =
+    { alt : Bool
+    , control : Bool
+    , meta : Bool
+    , shift : Bool
     }
 
 
@@ -61,6 +82,8 @@ type Msg
     | GoToHoveredPosition
     | StartSelecting
     | StopSelecting
+    | ReleaseModifierKey ModifierKeyType
+    | HoldModifierKey ModifierKeyType
 
 
 initModel : Model
@@ -69,6 +92,12 @@ initModel =
     , cursor = Position 0 0
     , hover = NoHover
     , selection = NoSelection
+    , modifier =
+        { control = False
+        , meta = False
+        , shift = False
+        , alt = False
+        }
     }
 
 
@@ -85,17 +114,40 @@ subscriptions model =
     Sub.none
 
 
-keyDecoder : Decoder Msg
-keyDecoder =
+keyDecoder : KeyboardEventType -> InputModifier -> Decoder ( Msg, Bool )
+keyDecoder kind withModifier =
+    let
+        alwaysPreventDefault : msg -> ( msg, Bool )
+        alwaysPreventDefault msg =
+            ( msg, True )
+
+        msgDecoder : String -> Decoder Msg
+        msgDecoder =
+            case kind of
+                KeyUp ->
+                    keyUpToMsg
+
+                KeyDown ->
+                    keyDownToMsg withModifier
+    in
     JD.field "key" JD.string
-        |> JD.andThen keyToMsg
+        |> JD.andThen msgDecoder
+        |> JD.map alwaysPreventDefault
 
 
-keyToMsg : String -> Decoder Msg
-keyToMsg string =
+keyDownToMsg : InputModifier -> String -> Decoder Msg
+keyDownToMsg withPrefix string =
     case String.uncons string of
         Just ( char, "" ) ->
-            JD.succeed (InsertChar char)
+            let
+                { meta, alt, shift, control } =
+                    withPrefix
+            in
+            if meta || control then
+                JD.succeed NoOp
+
+            else
+                JD.succeed (InsertChar char)
 
         _ ->
             case string of
@@ -120,8 +172,39 @@ keyToMsg string =
                 "Enter" ->
                     JD.succeed NewLine
 
+                "Meta" ->
+                    JD.succeed (HoldModifierKey Meta)
+
+                "Alt" ->
+                    JD.succeed (HoldModifierKey Alt)
+
+                "Shift" ->
+                    JD.succeed (HoldModifierKey Shift)
+
+                "Control" ->
+                    JD.succeed (HoldModifierKey Control)
+
                 _ ->
                     JD.fail "This key does nothing"
+
+
+keyUpToMsg : String -> Decoder Msg
+keyUpToMsg string =
+    case string of
+        "Meta" ->
+            JD.succeed (ReleaseModifierKey Meta)
+
+        "Alt" ->
+            JD.succeed (ReleaseModifierKey Alt)
+
+        "Shift" ->
+            JD.succeed (ReleaseModifierKey Shift)
+
+        "Control" ->
+            JD.succeed (ReleaseModifierKey Control)
+
+        _ ->
+            JD.fail "This key does nothing"
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -224,6 +307,7 @@ update msg model =
 
                                     HoverChar position ->
                                         SelectedChar position
+
                             else
                                 hoversToPositions model.lines startHover endHover
                                     |> Maybe.map (\( from, to ) -> Selection from to)
@@ -239,6 +323,42 @@ update msg model =
             , Cmd.none
             )
 
+        HoldModifierKey key ->
+            let
+                previous =
+                    model.modifier
+            in
+            case key of
+                Meta ->
+                    ( { model | modifier = { previous | meta = True } }, Cmd.none )
+
+                Alt ->
+                    ( { model | modifier = { previous | alt = True } }, Cmd.none )
+
+                Shift ->
+                    ( { model | modifier = { previous | shift = True } }, Cmd.none )
+
+                Control ->
+                    ( { model | modifier = { previous | control = True } }, Cmd.none )
+
+        ReleaseModifierKey key ->
+            let
+                previous =
+                    model.modifier
+            in
+            case key of
+                Meta ->
+                    ( { model | modifier = { previous | meta = False } }, Cmd.none )
+
+                Alt ->
+                    ( { model | modifier = { previous | alt = False } }, Cmd.none )
+
+                Shift ->
+                    ( { model | modifier = { previous | shift = False } }, Cmd.none )
+
+                Control ->
+                    ( { model | modifier = { previous | control = False } }, Cmd.none )
+
 
 hoversToPositions : Array String -> Hover -> Hover -> Maybe ( Position, Position )
 hoversToPositions lines from to =
@@ -249,6 +369,7 @@ hoversToPositions lines from to =
                 ( position
                 , { line = line, column = lastColumn lines line }
                 )
+
             else
                 ( { line = line + 1, column = 0 }
                 , position
@@ -285,6 +406,7 @@ hoversToPositions lines from to =
                 ( smaller, bigger ) =
                     if comparePositions position1 position2 == LT then
                         ( position1, position2 )
+
                     else
                         ( position2, position1 )
             in
@@ -295,8 +417,10 @@ comparePositions : Position -> Position -> Order
 comparePositions from to =
     if from.line < to.line || (from.line == to.line && from.column < to.column) then
         LT
+
     else if from == to then
         EQ
+
     else
         GT
 
@@ -349,6 +473,7 @@ newLine ({ cursor, lines } as model) =
                     (\i content ->
                         if i == line then
                             String.left column content
+
                         else
                             content
                     )
@@ -400,6 +525,7 @@ insertChar char ({ cursor, lines } as model) =
                     (\i content ->
                         if i == line then
                             lineWithCharAdded content
+
                         else
                             content
                     )
@@ -420,6 +546,7 @@ removeCharBefore : Model -> Model
 removeCharBefore ({ cursor, lines } as model) =
     if isStartOfDocument cursor then
         model
+
     else
         let
             { line, column } =
@@ -435,15 +562,19 @@ removeCharBefore ({ cursor, lines } as model) =
                 if lineNum == line - 1 then
                     if isFirstColumn column then
                         [ content ++ lineContent lines line ]
+
                     else
                         [ content ]
+
                 else if lineNum == line then
                     if isFirstColumn column then
                         []
+
                     else
                         [ String.left (column - 1) content
                             ++ String.dropLeft column content
                         ]
+
                 else
                     [ content ]
 
@@ -464,6 +595,7 @@ removeCharAfter : Model -> Model
 removeCharAfter ({ cursor, lines } as model) =
     if isEndOfDocument lines cursor then
         model
+
     else
         let
             { line, column } =
@@ -478,15 +610,19 @@ removeCharAfter ({ cursor, lines } as model) =
                 if lineNum == line then
                     if isOnLastColumn then
                         [ content ++ lineContent lines (line + 1) ]
+
                     else
                         [ String.left column content
                             ++ String.dropLeft (column + 1) content
                         ]
+
                 else if lineNum == line + 1 then
                     if isOnLastColumn then
                         []
+
                     else
                         [ content ]
+
                 else
                     [ content ]
 
@@ -507,6 +643,7 @@ moveUp : Position -> Array String -> Position
 moveUp { line, column } lines =
     if isFirstLine line then
         startOfDocument
+
     else
         let
             line_ : Int
@@ -522,6 +659,7 @@ moveDown : Position -> Array String -> Position
 moveDown { line, column } lines =
     if isLastLine lines line then
         endOfDocument lines
+
     else
         let
             line_ : Int
@@ -537,6 +675,7 @@ moveLeft : Position -> Array String -> Position
 moveLeft ({ line, column } as position) lines =
     if isStartOfDocument position then
         position
+
     else if isFirstColumn column then
         let
             line_ : Int
@@ -546,6 +685,7 @@ moveLeft ({ line, column } as position) lines =
         { line = line_
         , column = lastColumn lines line_
         }
+
     else
         { line = line
         , column = column - 1
@@ -556,10 +696,12 @@ moveRight : Position -> Array String -> Position
 moveRight ({ line, column } as position) lines =
     if isEndOfDocument lines position then
         position
+
     else if isLastColumn lines line column then
         { line = nextLine lines line
         , column = 0
         }
+
     else
         { line = line
         , column = column + 1
@@ -667,7 +809,7 @@ view model =
 
 
 viewDebug : Model -> Html Msg
-viewDebug { lines, cursor, hover, selection } =
+viewDebug { lines, cursor, hover, selection, modifier } =
     let
         printPosition : Position -> String
         printPosition pos =
@@ -708,6 +850,24 @@ viewDebug { lines, cursor, hover, selection } =
                     result ++ [ H.text str, H.br [] [] ]
             in
             List.foldl reducer [] (Array.toList lns)
+
+        printSuperKeys : InputModifier -> String
+        printSuperKeys { control, meta, alt, shift } =
+            let
+                convert label keyTypeState =
+                    if keyTypeState then
+                        label
+
+                    else
+                        ""
+            in
+            [ convert "control" control
+            , convert "meta" meta
+            , convert "alt" alt
+            , convert "shift" shift
+            ]
+                |> List.filter (\s -> s /= "")
+                |> String.join " "
     in
     H.div
         [ HA.style "max-width" "100%" ]
@@ -721,6 +881,8 @@ viewDebug { lines, cursor, hover, selection } =
         , H.pre [] [ H.text (printSelection selection) ]
         , H.text "selected text:"
         , H.pre [] [ H.text (selectedText selection hover lines) ]
+        , H.text "super keys:"
+        , H.pre [] [ H.text (printSuperKeys modifier) ]
         ]
 
 
@@ -743,10 +905,13 @@ selectedText selection currentHover lines =
                             line
                                 |> String.dropLeft from.column
                                 |> String.left (to.column - from.column + 1)
+
                         else if i == 0 then
                             String.dropLeft from.column line
+
                         else if i == numberOfLines - 1 then
                             String.left (to.column + 1) line
+
                         else
                             line
                     )
@@ -772,6 +937,10 @@ selectedText selection currentHover lines =
 
 viewEditor : Model -> Html Msg
 viewEditor model =
+    let
+        { modifier } =
+            model
+    in
     H.div
         [ HA.style "display" "flex"
         , HA.style "flex-direction" "row"
@@ -779,7 +948,8 @@ viewEditor model =
         , HA.style "font-size" (String.fromFloat fontSize ++ "px")
         , HA.style "line-height" (String.fromFloat lineHeight ++ "px")
         , HA.style "white-space" "pre"
-        , HE.on "keydown" keyDecoder
+        , HE.preventDefaultOn "keydown" (keyDecoder KeyDown modifier)
+        , HE.preventDefaultOn "keyup" (keyDecoder KeyUp modifier)
         , HA.tabindex 0
         , HA.id "editor"
         ]
@@ -863,10 +1033,12 @@ viewChar position hover selection lines line column char =
         viewCursor
             position
             (String.fromChar char)
+
     else if selection /= NoSelection && isSelected lines selection hover line column then
         viewSelectedChar
             { line = line, column = column }
             (String.fromChar char)
+
     else
         H.span
             [ onHover { line = line, column = column } ]
@@ -882,11 +1054,13 @@ isSelected lines selection currentHover line column =
                 && (to.line >= line)
                 && (if from.line == line then
                         from.column <= column
+
                     else
                         True
                    )
                 && (if to.line == line then
                         to.column >= column
+
                     else
                         True
                    )
@@ -909,7 +1083,7 @@ isSelected lines selection currentHover line column =
 
 nbsp : String
 nbsp =
-    " "
+    "\u{00A0}"
 
 
 viewCursor : Position -> String -> Html Msg
