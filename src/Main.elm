@@ -819,7 +819,9 @@ view model =
                         ]
                     ]
                 , viewEditor model
-                , viewDebug model
+                , viewStatusBar model
+
+                -- , viewDebug model
                 ]
     in
     { title = "elm-editor"
@@ -960,6 +962,38 @@ selectedText selection currentHover lines =
             positionsToString from to
 
 
+viewStatusBar : Model -> Html Msg
+viewStatusBar model =
+    let
+        { cursor } =
+            model
+
+        printPosition : Position -> String
+        printPosition pos =
+            "ln: " ++ String.fromInt pos.line ++ " col: " ++ String.fromInt pos.column
+    in
+    H.div
+        [ css
+            [ position absolute
+            , bottom (px 0)
+            , left (px 0)
+            , boxSizing borderBox
+            , width (vw 100)
+            , height (px 28)
+            , padding2 (px 0) (px 8)
+            , backgroundColor (hex "#FF9249")
+            , displayFlex
+            , alignItems center
+            ]
+        ]
+        [ div []
+            [ cursor
+                |> printPosition
+                |> text
+            ]
+        ]
+
+
 viewEditor : Model -> Html Msg
 viewEditor model =
     let
@@ -969,7 +1003,7 @@ viewEditor model =
     H.div
         [ css
             [ displayFlex
-            , height (vh 100)
+            , minHeight (vh 100)
             , flexDirection row
             , fontFamily monospace
             , Css.fontSize (px fontSize)
@@ -1015,6 +1049,10 @@ viewContent model =
             , flex (int 1)
             , backgroundColor (hex "#f0f0f0")
             ]
+        , style "-webkit-user-select" "none"
+        , style "-webkit-touch-callout" "none"
+        , style "-moz-user-select" "none"
+        , style "-ms-user-select" "none"
         , style "user-select" "none"
         , HE.onMouseDown StartSelecting
         , HE.onMouseUp StopSelecting
