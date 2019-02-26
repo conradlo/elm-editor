@@ -1,18 +1,20 @@
 module Main exposing (Hover(..), InputModifier, KeyboardEventType(..), Model, ModifierKeyType(..), Msg(..), Position, Selection(..), clampColumn, comparePositions, endOfDocument, fontSize, hoversToPositions, init, initModel, insertChar, isEndOfDocument, isFirstColumn, isFirstLine, isLastColumn, isLastLine, isSelected, isStartOfDocument, keyDecoder, keyDownToMsg, keyUpToMsg, lastColumn, lastLine, lineContent, lineHeight, lineLength, main, maxLine, moveDown, moveLeft, moveRight, moveUp, nbsp, newLine, nextLine, onHover, previousLine, removeCharAfter, removeCharBefore, sanitizeHover, selectedText, startOfDocument, subscriptions, update, view, viewChar, viewChars, viewContent, viewCursor, viewDebug, viewEditor, viewLine, viewLineNumber, viewLineNumbers, viewLines, viewSelectedChar)
 
 import Array exposing (Array)
-import Browser as Browser
+import Browser as Browser exposing (Document)
 import Browser.Dom as Dom
-import Html as H exposing (Attribute, Html)
-import Html.Attributes as HA
-import Html.Events as HE
+import Css as Css exposing (..)
+import Css.Global exposing (body, global)
+import Html.Styled as H exposing (..)
+import Html.Styled.Attributes as H exposing (css, href, src, style)
+import Html.Styled.Events as HE exposing (..)
 import Json.Decode as JD exposing (Decoder)
 import Task
 
 
 main : Program () Model Msg
 main =
-    Browser.element
+    Browser.document
         { init = init
         , update = update
         , view = view
@@ -800,12 +802,29 @@ lineLength lines lineNum =
         |> String.length
 
 
-view : Model -> Html Msg
+testDiv : Html Msg
+testDiv =
+    H.div [] []
+
+
+view : Model -> Document Msg
 view model =
-    H.div []
-        [ viewEditor model
-        , viewDebug model
-        ]
+    let
+        app =
+            H.div []
+                [ global
+                    [ body
+                        [ Css.padding (pct 0)
+                        , Css.margin (pct 0)
+                        ]
+                    ]
+                , viewEditor model
+                , viewDebug model
+                ]
+    in
+    { title = "elm-editor"
+    , body = [ H.toUnstyled app ]
+    }
 
 
 viewDebug : Model -> Html Msg
@@ -870,9 +889,15 @@ viewDebug { lines, cursor, hover, selection, modifier } =
                 |> String.join " "
     in
     H.div
-        [ HA.style "max-width" "100%" ]
+        [ css
+            [ maxWidth (pct 100.0)
+            ]
+        ]
         [ H.text "lines:"
-        , H.pre [ HA.style "white-space" "pre-wrap" ] (printLines lines)
+        , H.pre
+            [ css [ whiteSpace preWrap ]
+            ]
+            (printLines lines)
         , H.text "cursor:"
         , H.pre [] [ H.text (printPosition cursor) ]
         , H.text "hover:"
@@ -942,16 +967,19 @@ viewEditor model =
             model
     in
     H.div
-        [ HA.style "display" "flex"
-        , HA.style "flex-direction" "row"
-        , HA.style "font-family" "monospace"
-        , HA.style "font-size" (String.fromFloat fontSize ++ "px")
-        , HA.style "line-height" (String.fromFloat lineHeight ++ "px")
-        , HA.style "white-space" "pre"
+        [ css
+            [ displayFlex
+            , height (vh 100)
+            , flexDirection row
+            , fontFamily monospace
+            , Css.fontSize (px fontSize)
+            , Css.lineHeight (px lineHeight)
+            , whiteSpace Css.pre
+            ]
+        , H.tabindex 0
+        , H.id "editor"
         , HE.preventDefaultOn "keydown" (keyDecoder KeyDown modifier)
         , HE.preventDefaultOn "keyup" (keyDecoder KeyUp modifier)
-        , HA.tabindex 0
-        , HA.id "editor"
         ]
         [ viewLineNumbers model
         , viewContent model
@@ -961,11 +989,13 @@ viewEditor model =
 viewLineNumbers : Model -> Html Msg
 viewLineNumbers model =
     H.div
-        [ HA.style "width" "2em"
-        , HA.style "text-align" "center"
-        , HA.style "color" "#888"
-        , HA.style "display" "flex"
-        , HA.style "flex-direction" "column"
+        [ css
+            [ width (Css.em 2)
+            , textAlign center
+            , color (hex "#888")
+            , displayFlex
+            , flexDirection column
+            ]
         ]
         (List.range 1 (Array.length model.lines)
             |> List.map viewLineNumber
@@ -980,10 +1010,12 @@ viewLineNumber n =
 viewContent : Model -> Html Msg
 viewContent model =
     H.div
-        [ HA.style "position" "relative"
-        , HA.style "flex" "1"
-        , HA.style "background-color" "#f0f0f0"
-        , HA.style "user-select" "none"
+        [ css
+            [ position relative
+            , flex (int 1)
+            , backgroundColor (hex "#f0f0f0")
+            ]
+        , style "user-select" "none"
         , HE.onMouseDown StartSelecting
         , HE.onMouseUp StopSelecting
         , HE.onClick GoToHoveredPosition
@@ -1004,11 +1036,13 @@ viewLines position hover selection lines =
 viewLine : Position -> Hover -> Selection -> Array String -> Int -> String -> Html Msg
 viewLine position hover selection lines line content =
     H.div
-        [ HA.style "position" "absolute"
-        , HA.style "left" "0"
-        , HA.style "right" "0"
-        , HA.style "height" (String.fromFloat lineHeight ++ "px")
-        , HA.style "top" (String.fromFloat (toFloat line * lineHeight) ++ "px")
+        [ css
+            [ Css.position absolute
+            , left (px 0)
+            , right (px 0)
+            , height (px lineHeight)
+            , top (px (toFloat line * lineHeight))
+            ]
         , HE.onMouseOver (Hover (HoverLine line))
         ]
         (if position.line == line && isLastColumn lines line position.column then
@@ -1089,7 +1123,7 @@ nbsp =
 viewCursor : Position -> String -> Html Msg
 viewCursor position char =
     H.span
-        [ HA.style "background-color" "orange"
+        [ css [ backgroundColor (hex "#471437") ]
         , onHover position
         ]
         [ H.text char ]
@@ -1098,7 +1132,7 @@ viewCursor position char =
 viewSelectedChar : Position -> String -> Html Msg
 viewSelectedChar position char =
     H.span
-        [ HA.style "background-color" "#ccc"
+        [ css [ "#ccc" |> hex |> backgroundColor ]
         , onHover position
         ]
         [ H.text char ]
