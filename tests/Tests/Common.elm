@@ -1,6 +1,6 @@
 module Tests.Common exposing (..)
 
-import ArchitectureTest.Types exposing (..)
+import ArchitectureTest exposing (..)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Main exposing (..)
 
@@ -10,7 +10,20 @@ app =
     { model = ConstantModel initModel
     , update = NormalUpdate update
     , msgFuzzer = msgFuzzer
+    , modelToString = modelToString
+    , msgToString = msgToString
     }
+
+modelToString : Model -> String
+modelToString model =
+    "{ currentCoins = "
+        ++ "TODO: modelToString"
+        ++ " }"
+
+msgToString : Msg -> String
+msgToString msg =
+    case msg of
+        _ -> "TODO: msgToString"
 
 
 msgFuzzer : Fuzzer Msg

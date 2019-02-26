@@ -14,7 +14,7 @@ doesNothingIfHoverIsNoHover =
         goToHoveredPosition
         (\model -> model.hover == NoHover)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             modelBeforeMsg
                 |> Expect.equal finalModel
 
@@ -36,7 +36,7 @@ movesToLastColumnOfHoveredLineIfHoverIsHoverLine =
                     False
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             case modelBeforeMsg.hover of
                 NoHover ->
                     Expect.fail "hover should have been HoverLine"
@@ -69,7 +69,7 @@ movesToHoveredPositionIfHoverIsHoverChar =
                     True
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             case modelBeforeMsg.hover of
                 NoHover ->
                     Expect.fail "hover should have been HoverChar"

@@ -1,9 +1,8 @@
 module Tests.InsertChar exposing (..)
 
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
-import Main exposing (Msg(InsertChar), lineContent, lineLength)
+import Main exposing (Msg(..), lineContent, lineLength)
 import Test exposing (..)
 import Tests.Common exposing (..)
 
@@ -14,9 +13,9 @@ movesRight =
         app
         insertChar
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        (\modelBeforeMsg msg finalModel   ->
             finalModel.cursor.column
-                |> Expect.equal (modelBeforeMsg.cursor.column + 1)
+                |> Expect.equal (modelBeforeMsg.cursor.column + 1))
 
 
 doesntMoveUpOrDown : Test
@@ -25,7 +24,7 @@ doesntMoveUpOrDown =
         app
         insertChar
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor.line
                 |> Expect.equal modelBeforeMsg.cursor.line
 
@@ -36,7 +35,7 @@ makesLineLonger =
         app
         insertChar
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             lineLength finalModel.lines finalModel.cursor.line
                 |> Expect.equal (lineLength modelBeforeMsg.lines modelBeforeMsg.cursor.line + 1)
 
@@ -47,7 +46,7 @@ insertsChar =
         app
         insertChar
     <|
-        \_ _ modelBeforeMsg msg finalModel ->
+        \modelBeforeMsg msg finalModel ->
             case msg of
                 InsertChar char ->
                     let

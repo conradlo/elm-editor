@@ -1,7 +1,7 @@
 module Tests.RemoveCharAfter exposing (..)
 
+import Array
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (isEndOfDocument, isLastColumn, isLastLine, lineContent, lineLength)
 import Test exposing (..)
@@ -15,7 +15,7 @@ doesNothingOnEndOfDocument =
         removeCharAfter
         (\model -> isEndOfDocument model.lines model.cursor)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel
                 |> Expect.equal modelBeforeMsg
 
@@ -26,7 +26,7 @@ doesntMove =
         app
         removeCharAfter
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor
                 |> Expect.equal modelBeforeMsg.cursor
 
@@ -41,7 +41,7 @@ decreasesLineCountOnLastColumnOfNotLastLine =
                 && not (isLastLine model.lines model.cursor.line)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             Array.length finalModel.lines
                 |> Expect.equal (Array.length modelBeforeMsg.lines - 1)
 
@@ -56,7 +56,7 @@ combinesLinesTogetherOnLastColumnOfNotLastLine =
                 && not (isLastLine model.lines model.cursor.line)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             let
                 oldLine1 =
                     lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line
@@ -81,7 +81,7 @@ decreasesCurrentLineLengthOnNotLastColumn =
         removeCharAfter
         (\model -> not (isLastColumn model.lines model.cursor.line model.cursor.column))
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             let
                 newLineLength =
                     lineLength finalModel.lines finalModel.cursor.line
@@ -100,7 +100,7 @@ removesTheCharOnNotLastColumn =
         removeCharAfter
         (\model -> not (isLastColumn model.lines model.cursor.line model.cursor.column))
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             let
                 oldLine =
                     lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line

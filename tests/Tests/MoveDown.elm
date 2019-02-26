@@ -1,7 +1,6 @@
 module Tests.MoveDown exposing (..)
 
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (endOfDocument, lastColumn, lastLine, lineLength)
 import Test exposing (..)
@@ -15,7 +14,7 @@ jumpsToEndOfLineIfOnLastLine =
         moveDown
         (\model -> model.cursor.line == lastLine model.lines)
     <|
-        \_ _ _ _ finalModel ->
+        \_ _ finalModel ->
             finalModel.cursor
                 |> Expect.equal (endOfDocument finalModel.lines)
 
@@ -27,7 +26,7 @@ movesDownALineIfNotOnLastLine =
         moveDown
         (\model -> model.cursor.line /= lastLine model.lines)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             finalModel.cursor.line
                 |> Expect.equal (modelBeforeMsg.cursor.line + 1)
 
@@ -42,7 +41,7 @@ staysOnSameColumnIfNotOnLastLineAndEnoughCharsBelowCursor =
                 && (lineLength model.lines (model.cursor.line + 1) >= model.cursor.column)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             finalModel.cursor.column
                 |> Expect.equal modelBeforeMsg.cursor.column
 
@@ -57,7 +56,7 @@ movesToLastColumnIfNotOnLastLineAndNoCharBelowCursor =
                 && (lineLength model.lines (model.cursor.line + 1) < model.cursor.column)
         )
     <|
-        \_ _ _ _ finalModel ->
+        \_ _ finalModel ->
             finalModel.cursor.column
                 |> Expect.equal
                     (lastColumn

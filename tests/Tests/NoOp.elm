@@ -9,6 +9,6 @@ import Tests.Common exposing (..)
 doesNothing : Test
 doesNothing =
     msgTest "NoOp does nothing" app noOp <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             modelBeforeMsg
                 |> Expect.equal finalModel

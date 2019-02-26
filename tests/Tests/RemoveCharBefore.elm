@@ -1,7 +1,6 @@
 module Tests.RemoveCharBefore exposing (..)
-
+import Array as Array
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (isStartOfDocument, lineContent, lineLength)
 import Test exposing (..)
@@ -15,7 +14,7 @@ doesNothingOnStartOfDocument =
         removeCharBefore
         (\model -> isStartOfDocument model.cursor)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel
                 |> Expect.equal modelBeforeMsg
 
@@ -30,7 +29,7 @@ decreasesLineCountOnFirstColumnOfNotFirstLine =
                 && (model.cursor.line /= 0)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             Array.length finalModel.lines
                 |> Expect.equal (Array.length modelBeforeMsg.lines - 1)
 
@@ -45,7 +44,7 @@ combinesLinesTogetherOnFirstColumnOfNotFirstLine =
                 && (model.cursor.line /= 0)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             let
                 newLine =
                     lineContent finalModel.lines finalModel.cursor.line
@@ -70,7 +69,7 @@ movesUpALineOnFirstColumnOfNotFirstLine =
                 && (model.cursor.line /= 0)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor.line
                 |> Expect.equal (modelBeforeMsg.cursor.line - 1)
 
@@ -85,7 +84,7 @@ movesToPreviousEndOfPreviousLineOnFirstColumnOfNotFirstLine =
                 && (model.cursor.line /= 0)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor.column
                 |> Expect.equal (lineLength modelBeforeMsg.lines (modelBeforeMsg.cursor.line - 1))
 
@@ -97,7 +96,7 @@ decreasesCurrentLineLengthOnNotFirstColumn =
         removeCharBefore
         (\model -> model.cursor.column /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             lineContent finalModel.lines finalModel.cursor.line
                 |> String.length
                 |> Expect.equal
@@ -115,7 +114,7 @@ movesLeftOnNotFirstColumn =
         removeCharBefore
         (\model -> model.cursor.column /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor.column
                 |> Expect.equal (modelBeforeMsg.cursor.column - 1)
 
@@ -127,7 +126,7 @@ doesntMoveUpOrDownOnNotFirstColumn =
         removeCharBefore
         (\model -> model.cursor.column /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor.line
                 |> Expect.equal modelBeforeMsg.cursor.line
 
@@ -139,7 +138,7 @@ removesTheCharOnNotFirstColumn =
         removeCharBefore
         (\model -> model.cursor.column /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             let
                 oldLine =
                     lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line

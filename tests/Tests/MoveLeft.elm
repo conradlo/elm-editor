@@ -1,7 +1,6 @@
 module Tests.MoveLeft exposing (..)
 
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (isStartOfDocument, lineLength)
 import Test exposing (..)
@@ -15,7 +14,7 @@ doesNothingOnStartOfDocument =
         moveLeft
         (\model -> isStartOfDocument model.cursor)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             finalModel
                 |> Expect.equal modelBeforeMsg
 
@@ -27,7 +26,7 @@ movesLeftIfNotOnFirstColumn =
         moveLeft
         (\model -> model.cursor.column /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             finalModel.cursor.column
                 |> Expect.equal (modelBeforeMsg.cursor.column - 1)
 
@@ -39,7 +38,7 @@ movesToEndOfPreviousLineIfOnTheFirstColumnAndNotOnFirstLine =
         moveLeft
         (\model -> model.cursor.column == 0 && model.cursor.line /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             Expect.all
                 [ .line >> Expect.equal (modelBeforeMsg.cursor.line - 1)
                 , .column

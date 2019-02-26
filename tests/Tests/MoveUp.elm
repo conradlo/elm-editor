@@ -1,7 +1,6 @@
 module Tests.MoveUp exposing (..)
 
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (lineLength, startOfDocument)
 import Test exposing (..)
@@ -15,7 +14,7 @@ jumpsToStartOfLineIfOnFirstLine =
         moveUp
         (\model -> model.cursor.line == 0)
     <|
-        \_ _ _ _ finalModel ->
+        \ _ _ finalModel ->
             finalModel.cursor
                 |> Expect.equal startOfDocument
 
@@ -27,7 +26,7 @@ movesUpALineIfNotOnFirstLine =
         moveUp
         (\model -> model.cursor.line /= 0)
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             finalModel.cursor.line
                 |> Expect.equal (modelBeforeMsg.cursor.line - 1)
 
@@ -42,7 +41,7 @@ staysOnSameColumnIfNotOnFirstLineAndEnoughCharsAboveCursor =
                 && (lineLength model.lines (model.cursor.line - 1) >= model.cursor.column)
         )
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             finalModel.cursor.column
                 |> Expect.equal modelBeforeMsg.cursor.column
 
@@ -57,7 +56,7 @@ movesToLastColumnIfNotOnFirstLineAndNoCharAboveCursor =
                 && (lineLength model.lines (model.cursor.line - 1) < model.cursor.column)
         )
     <|
-        \_ _ _ _ finalModel ->
+        \_ _ finalModel ->
             finalModel.cursor.column
                 |> Expect.equal
                     (lineLength

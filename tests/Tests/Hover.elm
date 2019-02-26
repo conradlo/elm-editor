@@ -10,7 +10,7 @@ import Tests.Common exposing (..)
 setsHoverWithinBounds : Test
 setsHoverWithinBounds =
     msgTest "Hover sets hover within bounds" app hover <|
-        \_ _ modelBeforeMsg msg finalModel ->
+        \modelBeforeMsg msg finalModel ->
             case msg of
                 Hover hover ->
                     case hover of

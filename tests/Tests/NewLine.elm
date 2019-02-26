@@ -1,7 +1,7 @@
 module Tests.NewLine exposing (..)
 
+import Array
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (lineContent)
 import Test exposing (..)
@@ -14,7 +14,7 @@ movesDownALine =
         app
         newLine
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg msg finalModel ->
             finalModel.cursor.line
                 |> Expect.equal (modelBeforeMsg.cursor.line + 1)
 
@@ -25,7 +25,7 @@ movesToFirstColumn =
         app
         newLine
     <|
-        \_ _ _ _ finalModel ->
+        \_ _ finalModel ->
             finalModel.cursor.column
                 |> Expect.equal 0
 
@@ -36,7 +36,7 @@ addsALine =
         app
         newLine
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             Array.length finalModel.lines
                 |> Expect.equal (Array.length modelBeforeMsg.lines + 1)
 
@@ -47,7 +47,7 @@ splitsALineIntoTwo =
         app
         newLine
     <|
-        \_ _ modelBeforeMsg _ finalModel ->
+        \modelBeforeMsg _ finalModel ->
             let
                 oldLine =
                     lineContent modelBeforeMsg.lines modelBeforeMsg.cursor.line

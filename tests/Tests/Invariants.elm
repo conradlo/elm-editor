@@ -1,7 +1,7 @@
 module Tests.Invariants exposing (..)
 
+import Array
 import ArchitectureTest exposing (..)
-import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Main exposing (..)
 import Test exposing (..)
