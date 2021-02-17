@@ -39,6 +39,7 @@ type ModifierKeyType
     | Control
     | Meta
     | Shift
+    | AltGraph
 
 
 type alias InputModifier =
@@ -46,6 +47,7 @@ type alias InputModifier =
     , control : Bool
     , meta : Bool
     , shift : Bool
+    , altgr : Bool
     }
 
 
@@ -76,6 +78,7 @@ type Msg
     | MoveRight
     | NewLine
     | InsertChar Char
+    | InsertString String
     | RemoveCharBefore
     | RemoveCharAfter
     | Hover Hover
@@ -84,6 +87,7 @@ type Msg
     | StopSelecting
     | ReleaseModifierKey ModifierKeyType
     | HoldModifierKey ModifierKeyType
+    | Focus
 
 
 initModel : Model
@@ -97,6 +101,7 @@ initModel =
         , meta = False
         , shift = False
         , alt = False
+        , altgr = False
         }
     }
 
@@ -104,7 +109,7 @@ initModel =
 init : flags -> ( Model, Cmd Msg )
 init _ =
     ( initModel
-    , Dom.focus "editor"
+    , Dom.focus "editor_hidden_input"
         |> Task.attempt (always NoOp)
     )
 
@@ -114,6 +119,15 @@ subscriptions model =
     Sub.none
 
 
+compositionEndDecoder =
+    JD.field "data" JD.string |> JD.map (\x -> { message = InsertString x, preventDefault = False, stopPropagation = False })
+
+
+focusDecoder : Decoder ( Msg, Bool )
+focusDecoder =
+    JD.succeed ( Focus, True )
+
+
 keyDecoder : KeyboardEventType -> InputModifier -> Decoder ( Msg, Bool )
 keyDecoder kind withModifier =
     let
@@ -121,16 +135,19 @@ keyDecoder kind withModifier =
         alwaysPreventDefault msg =
             ( msg, True )
 
-        msgDecoder : String -> Decoder Msg
-        msgDecoder =
-            case kind of
-                KeyUp ->
-                    keyUpToMsg
+        msgDecoder : { isCompositing : Bool, key : String } -> Decoder Msg
+        msgDecoder jd =
+            case ( jd.isCompositing, kind ) of
+                ( False, KeyUp ) ->
+                    keyUpToMsg jd.key
 
-                KeyDown ->
-                    keyDownToMsg withModifier
+                ( False, KeyDown ) ->
+                    keyDownToMsg withModifier jd.key
+
+                ( True, _ ) ->
+                    JD.succeed NoOp
     in
-    JD.field "key" JD.string
+    JD.map2 (\k isc -> { key = k, isCompositing = isc }) (JD.field "key" JD.string) (JD.field "isComposing" JD.bool)
         |> JD.andThen msgDecoder
         |> JD.map alwaysPreventDefault
 
@@ -140,7 +157,7 @@ keyDownToMsg withPrefix string =
     case String.uncons string of
         Just ( char, "" ) ->
             let
-                { meta, alt, shift, control } =
+                { meta, alt, shift, control, altgr } =
                     withPrefix
             in
             if meta || control then
@@ -184,6 +201,9 @@ keyDownToMsg withPrefix string =
                 "Control" ->
                     JD.succeed (HoldModifierKey Control)
 
+                "AltGraph" ->
+                    JD.succeed (HoldModifierKey AltGraph)
+
                 _ ->
                     JD.fail "This key does nothing"
 
@@ -203,6 +223,9 @@ keyUpToMsg string =
         "Control" ->
             JD.succeed (ReleaseModifierKey Control)
 
+        "AltGraph" ->
+            JD.succeed (ReleaseModifierKey AltGraph)
+
         _ ->
             JD.fail "This key does nothing"
 
@@ -210,6 +233,12 @@ keyUpToMsg string =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Focus ->
+            ( model
+            , Dom.focus "editor_hidden_input"
+                |> Task.attempt (always NoOp)
+            )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -241,6 +270,11 @@ update msg model =
 
         InsertChar char ->
             ( insertChar char model
+            , Cmd.none
+            )
+
+        InsertString string ->
+            ( insertString string model
             , Cmd.none
             )
 
@@ -341,6 +375,9 @@ update msg model =
                 Control ->
                     ( { model | modifier = { previous | control = True } }, Cmd.none )
 
+                AltGraph ->
+                    ( { model | modifier = { previous | altgr = True } }, Cmd.none )
+
         ReleaseModifierKey key ->
             let
                 previous =
@@ -358,6 +395,9 @@ update msg model =
 
                 Control ->
                     ( { model | modifier = { previous | control = False } }, Cmd.none )
+
+                AltGraph ->
+                    ( { model | modifier = { previous | altgr = False } }, Cmd.none )
 
 
 hoversToPositions : Array String -> Hover -> Hover -> Maybe ( Position, Position )
@@ -534,6 +574,42 @@ insertChar char ({ cursor, lines } as model) =
         newCursor =
             { line = line
             , column = column + 1
+            }
+    in
+    { model
+        | lines = newLines
+        , cursor = newCursor
+    }
+
+
+insertString : String -> Model -> Model
+insertString string ({ cursor, lines } as model) =
+    let
+        { line, column } =
+            cursor
+
+        lineWithCharAdded : String -> String
+        lineWithCharAdded content =
+            String.left column content
+                ++ string
+                ++ String.dropLeft column content
+
+        newLines : Array String
+        newLines =
+            lines
+                |> Array.indexedMap
+                    (\i content ->
+                        if i == line then
+                            lineWithCharAdded content
+
+                        else
+                            content
+                    )
+
+        newCursor : Position
+        newCursor =
+            { line = line
+            , column = column + String.length string
             }
     in
     { model
@@ -852,7 +928,7 @@ viewDebug { lines, cursor, hover, selection, modifier } =
             List.foldl reducer [] (Array.toList lns)
 
         printSuperKeys : InputModifier -> String
-        printSuperKeys { control, meta, alt, shift } =
+        printSuperKeys { control, meta, alt, shift, altgr } =
             let
                 convert label keyTypeState =
                     if keyTypeState then
@@ -865,6 +941,7 @@ viewDebug { lines, cursor, hover, selection, modifier } =
             , convert "meta" meta
             , convert "alt" alt
             , convert "shift" shift
+            , convert "altgr" altgr
             ]
                 |> List.filter (\s -> s /= "")
                 |> String.join " "
@@ -948,13 +1025,21 @@ viewEditor model =
         , HA.style "font-size" (String.fromFloat fontSize ++ "px")
         , HA.style "line-height" (String.fromFloat lineHeight ++ "px")
         , HA.style "white-space" "pre"
-        , HE.preventDefaultOn "keydown" (keyDecoder KeyDown modifier)
-        , HE.preventDefaultOn "keyup" (keyDecoder KeyUp modifier)
         , HA.tabindex 0
         , HA.id "editor"
+        , HE.preventDefaultOn "click" focusDecoder
         ]
         [ viewLineNumbers model
         , viewContent model
+        , H.div [ HA.attribute "style" "overflow:hidden; height:0" ]
+            [ H.input
+                [ HA.id "editor_hidden_input"
+                , HE.custom "compositionend" compositionEndDecoder
+                , HE.preventDefaultOn "keydown" (keyDecoder KeyDown modifier)
+                , HE.preventDefaultOn "keyup" (keyDecoder KeyUp modifier)
+                ]
+                []
+            ]
         ]
 
 
