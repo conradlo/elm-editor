@@ -1031,7 +1031,7 @@ viewEditor model =
         ]
         [ viewLineNumbers model
         , viewContent model
-        , H.div [ HA.attribute "style" "overflow:hidden; height:0" ]
+        , H.div [ HA.attribute "style" "overflow:hidden; height:0; outline: none; position: fixed; top:0" ]
             [ H.input
                 [ HA.id "editor_hidden_input"
                 , HE.custom "compositionend" compositionEndDecoder
